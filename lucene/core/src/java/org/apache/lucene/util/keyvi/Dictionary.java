@@ -16,6 +16,5 @@
  */
 package org.apache.lucene.util.keyvi;
 
-public class Dictionary {
-
-}
+/** A dictionary */
+public class Dictionary {}

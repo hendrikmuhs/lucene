@@ -17,132 +17,131 @@
 
 package org.apache.lucene.util.keyvi;
 
+/** Helper class to remember free positions in the sparse array. */
 public class SlidingWindowBitVectorPositionTracker {
 
-	private static int SLIDING_WINDOW_SIZE = 2048;
-	private static int SLIDING_WINDOW_MASK = 2047;
-	private static int SLIDING_WINDOW_SHIFT = 11;
+  private static int SLIDING_WINDOW_SIZE = 2048;
+  private static int SLIDING_WINDOW_MASK = 2047;
+  private static int SLIDING_WINDOW_SHIFT = 11;
 
-	private BitVector currentVector = new BitVector(SLIDING_WINDOW_SIZE);
-	private BitVector previousVector = new BitVector(SLIDING_WINDOW_SIZE);
-	private long windowStartPosition = 0;
+  private BitVector currentVector = new BitVector(SLIDING_WINDOW_SIZE);
+  private BitVector previousVector = new BitVector(SLIDING_WINDOW_SIZE);
+  private long windowStartPosition = 0;
 
-	public SlidingWindowBitVectorPositionTracker() {
+  public SlidingWindowBitVectorPositionTracker() {}
 
-	}
+  public boolean isSet(long position) {
+    // divide by SLIDING_WINDOW_SIZE
+    long blockerWindow = position >> SLIDING_WINDOW_SHIFT;
 
-	public boolean isSet(long position) {
-		// divide by SLIDING_WINDOW_SIZE
-		long blockerWindow = position >> SLIDING_WINDOW_SHIFT;
+    int blockerOffset = (int) position & SLIDING_WINDOW_MASK;
 
-		int blockerOffset = (int) position & SLIDING_WINDOW_MASK;
+    if (blockerWindow == windowStartPosition) {
+      return currentVector.get(blockerOffset);
+    }
 
-		if (blockerWindow == windowStartPosition) {
-			return currentVector.get(blockerOffset);
-		}
+    if (blockerWindow > windowStartPosition) {
+      return false;
+    }
 
-		if (blockerWindow > windowStartPosition) {
-			return false;
-		}
+    return previousVector.get(blockerOffset);
+  }
 
-		return previousVector.get(blockerOffset);
-	}
+  public long nextFreeSlot(long position) {
+    // divide by SLIDING_WINDOW_SIZE
+    long blockerWindow = position >> SLIDING_WINDOW_SHIFT;
 
-	public long nextFreeSlot(long position) {
-		// divide by SLIDING_WINDOW_SIZE
-		long blockerWindow = position >> SLIDING_WINDOW_SHIFT;
+    int blockerOffset = (int) position & SLIDING_WINDOW_MASK;
 
-		int blockerOffset = (int) position & SLIDING_WINDOW_MASK;
+    if (blockerWindow > windowStartPosition) {
+      return position;
+    }
 
-		if (blockerWindow > windowStartPosition) {
-			return position;
-		}
+    if (blockerWindow < windowStartPosition) {
+      long offset = previousVector.getNextNonSetBit(blockerOffset);
 
-		if (blockerWindow < windowStartPosition) {
-			long offset = previousVector.getNextNonSetBit(blockerOffset);
+      if (offset < SLIDING_WINDOW_SIZE) {
+        return offset + (blockerWindow << SLIDING_WINDOW_SHIFT);
+      }
 
-			if (offset < SLIDING_WINDOW_SIZE) {
-				return offset + (blockerWindow << SLIDING_WINDOW_SHIFT);
-			}
+      // else: check currentVector
+      ++blockerWindow;
+      blockerOffset = 0;
+    }
 
-			// else: check currentVector
-			++blockerWindow;
-			blockerOffset = 0;
-		}
+    return currentVector.getNextNonSetBit(blockerOffset) + (blockerWindow << SLIDING_WINDOW_SHIFT);
+  }
 
-		return currentVector.getNextNonSetBit(blockerOffset) + (blockerWindow << SLIDING_WINDOW_SHIFT);
-	}
+  public void set(long position) {
+    // divide by SLIDING_WINDOW_SIZE
+    long blockerWindow = position >> SLIDING_WINDOW_SHIFT;
 
-	public void set(long position) {
-		// divide by SLIDING_WINDOW_SIZE
-		long blockerWindow = position >> SLIDING_WINDOW_SHIFT;
+    int blockerOffset = (int) position & SLIDING_WINDOW_MASK;
 
-		int blockerOffset = (int) position & SLIDING_WINDOW_MASK;
+    if (blockerWindow > windowStartPosition) {
+      // swap and reset
+      BitVector tmp = previousVector;
+      previousVector = currentVector;
+      currentVector = tmp;
+      currentVector.clear();
+      windowStartPosition = blockerWindow;
+    }
 
-		if (blockerWindow > windowStartPosition) {
-			// swap and reset
-			BitVector tmp = previousVector;
-			previousVector = currentVector;
-			currentVector = tmp;
-			currentVector.clear();
-			windowStartPosition = blockerWindow;
-		}
+    if (blockerWindow == windowStartPosition) {
+      currentVector.set(blockerOffset);
+    } else if (windowStartPosition > 0 && blockerWindow == windowStartPosition - 1) {
+      previousVector.set(blockerOffset);
+    }
+  }
 
-		if (blockerWindow == windowStartPosition) {
-			currentVector.set(blockerOffset);
-		} else if (windowStartPosition > 0 && blockerWindow == windowStartPosition - 1) {
-			previousVector.set(blockerOffset);
-		}
-	}
+  public void setVector(BitVector other, long position) {
+    // divide by SLIDING_WINDOW_SIZE
+    long blockerWindow = position >> SLIDING_WINDOW_SHIFT;
+    long blockerWindowEnd = (position + other.size()) >> SLIDING_WINDOW_SHIFT;
+    int blockerOffset = (int) position & SLIDING_WINDOW_MASK;
 
-	public void setVector(BitVector other, long position) {
-		// divide by SLIDING_WINDOW_SIZE
-		long blockerWindow = position >> SLIDING_WINDOW_SHIFT;
-		long blockerWindowEnd = (position + other.size()) >> SLIDING_WINDOW_SHIFT;
-		int blockerOffset = (int) position & SLIDING_WINDOW_MASK;
+    // check if start position is already over the boundary now
+    if (blockerWindowEnd > windowStartPosition) {
+      // swap and reset
+      BitVector tmp = previousVector;
+      previousVector = currentVector;
+      currentVector = tmp;
+      currentVector.clear();
+      windowStartPosition = blockerWindow;
+    }
 
-		// check if start position is already over the boundary now
-		if (blockerWindowEnd > windowStartPosition) {
-			// swap and reset
-			BitVector tmp = previousVector;
-			previousVector = currentVector;
-			currentVector = tmp;
-			currentVector.clear();
-			windowStartPosition = blockerWindow;
-		}
+    if (blockerWindow == windowStartPosition) {
+      currentVector.setVector(other, blockerOffset);
+    } else if (windowStartPosition > 0 && blockerWindow == windowStartPosition - 1) {
+      previousVector.setVector(other, blockerOffset);
+      if (blockerWindowEnd == windowStartPosition) {
+        currentVector.setVectorAndShiftOther(other, SLIDING_WINDOW_SIZE - blockerOffset);
+      }
+    }
+  }
 
-		if (blockerWindow == windowStartPosition) {
-			currentVector.setVector(other, blockerOffset);
-		} else if (windowStartPosition > 0 && blockerWindow == windowStartPosition - 1) {
-			previousVector.setVector(other, blockerOffset);
-			if (blockerWindowEnd == windowStartPosition) {
-				currentVector.setVectorAndShiftOther(other, SLIDING_WINDOW_SIZE - blockerOffset);
-			}
-		}
+  public int isAvailable(BitVector requestedPositions, long position) {
+    // divide by SLIDING_WINDOW_SIZE
+    long blockerWindow = position >> SLIDING_WINDOW_SHIFT;
 
-	}
+    int blockerOffset = (int) position & SLIDING_WINDOW_MASK;
 
-	public int isAvailable(BitVector requestedPositions, long position) {
-		// divide by SLIDING_WINDOW_SIZE
-		long blockerWindow = position >> SLIDING_WINDOW_SHIFT;
+    if (blockerWindow == windowStartPosition) {
+      return currentVector.DisjointAndShiftThis(requestedPositions, blockerOffset);
+    }
 
-		int blockerOffset = (int) position & SLIDING_WINDOW_MASK;
+    if (blockerWindow > windowStartPosition) {
+      return 0;
+    }
 
-		if (blockerWindow == windowStartPosition) {
-			return currentVector.DisjointAndShiftThis(requestedPositions, blockerOffset);
-		}
+    int shift = previousVector.DisjointAndShiftThis(requestedPositions, blockerOffset);
 
-		if (blockerWindow > windowStartPosition) {
-			return 0;
-		}
+    if (shift == 0
+        && (SLIDING_WINDOW_SIZE - blockerOffset < KeyviConstants.MAX_TRANSITIONS_OF_A_STATE)) {
+      return requestedPositions.DisjointAndShiftOther(
+          currentVector, SLIDING_WINDOW_SIZE - blockerOffset);
+    }
 
-		int shift = previousVector.DisjointAndShiftThis(requestedPositions, blockerOffset);
-
-		if (shift == 0 && (SLIDING_WINDOW_SIZE - blockerOffset < KeyviConstants.MAX_TRANSITIONS_OF_A_STATE)) {
-			return requestedPositions.DisjointAndShiftOther(currentVector, SLIDING_WINDOW_SIZE - blockerOffset);
-		}
-
-		return shift;
-	}
-
+    return shift;
+  }
 }

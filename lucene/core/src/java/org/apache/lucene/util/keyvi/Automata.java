@@ -17,10 +17,10 @@
 package org.apache.lucene.util.keyvi;
 
 import java.io.IOException;
-
 import org.apache.lucene.codecs.CodecUtil;
 import org.apache.lucene.store.IndexInput;
 
+/** Low level Automata (FST) implementation */
 public class Automata {
 
   private final int startState;
@@ -34,7 +34,9 @@ public class Automata {
   private final long transitionsOffset;
 
   public Automata(IndexInput in) throws IOException {
-    int version = CodecUtil.checkHeader(in, Generator.CODEC_NAME, Generator.VERSION_CURRENT, Generator.VERSION_CURRENT);
+    int version =
+        CodecUtil.checkHeader(
+            in, Generator.CODEC_NAME, Generator.VERSION_CURRENT, Generator.VERSION_CURRENT);
     startState = in.readVInt();
     numberOfKeys = in.readVInt();
     numberOfStates = in.readVInt();
@@ -106,8 +108,8 @@ public class Automata {
     in.seek(transitionsOffset + 2 * (state + (c & 0xff)));
 
     // read it little endian order
-    short pt = (short) ((in.readByte() & 0xFF) | ((in.readByte() & 0xFF) <<  8) );
-    
+    short pt = (short) ((in.readByte() & 0xFF) | ((in.readByte() & 0xFF) << 8));
+
     if ((pt & 0xC000) == 0xC000) {
       return pt & 0x3FFF;
     } else if ((pt & 0x8000) > 0) {
@@ -119,8 +121,7 @@ public class Automata {
       overflowBucket = (pt >>> 4) + state + c - 512;
 
       // todo: implement overflow handling
-      
-      
+
       // resolved_ptr = keyvi::util::decodeVarshort(transitions_compact_ + overflow_bucket);
       // resolved_ptr = (resolved_ptr << 3) + (pt & 0x7);
       /*
@@ -129,9 +130,6 @@ public class Automata {
       return 0;
     }
 
-    
-    
     return state + (c & 0xff) - pt + 512;
   }
-
 }

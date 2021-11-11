@@ -19,66 +19,66 @@ package org.apache.lucene.util.keyvi;
 
 import java.nio.ShortBuffer;
 
+/** Helper class to encode variable length integers and shorts. */
 public class VInt {
-	public static long getVarShortLength(long value) {
-		return (value > 0x1fffffffffffL) ? 4 : (value < 0x40000000) ? (value < 0x8000) ? 1 : 2 : 3;
-	}
+  public static long getVarShortLength(long value) {
+    return (value > 0x1fffffffffffL) ? 4 : (value < 0x40000000) ? (value < 0x8000) ? 1 : 2 : 3;
+  }
 
-	public static int encodeVarShort(long value, short[] output) {
-		int outputSize = 0;
-		// While more than 15 bits of data are left, occupy the last output byte
-		// and set the next byte flag
-		while (value > 32767) {
-			// |32768: Set the next byte flag
-			output[outputSize] = (short) (((short) (value & 32767)) | 32768);
+  public static int encodeVarShort(long value, short[] output) {
+    int outputSize = 0;
+    // While more than 15 bits of data are left, occupy the last output byte
+    // and set the next byte flag
+    while (value > 32767) {
+      // |32768: Set the next byte flag
+      output[outputSize] = (short) (((short) (value & 32767)) | 32768);
 
-			// Remove the 15 bits we just wrote
-			value >>= 15;
-			outputSize++;
-		}
-		output[outputSize++] = (short) (((short) value) & 32767);
-		return outputSize;
-	}
+      // Remove the 15 bits we just wrote
+      value >>= 15;
+      outputSize++;
+    }
+    output[outputSize++] = (short) (((short) value) & 32767);
+    return outputSize;
+  }
 
-	public static long decodeVarShort(short[] input) {
-		long value = 0;
-		for (int i = 0;; i++) {
-			value |= ((long)input[i] & 32767) << (15 * i);
+  public static long decodeVarShort(short[] input) {
+    long value = 0;
+    for (int i = 0; ; i++) {
+      value |= ((long) input[i] & 32767) << (15 * i);
 
-			// If the next-byte flag is set
-			if ((input[i] & 32768) == 0) {
-				break;
-			}
-		}
-		return value;
-	}
-	
-	public static long decodeVarShort(short[] input, int offset) {
-		long value = 0;
-		for (int i = 0;; i++) {
-			value |= ((long)input[offset + i] & 32767) << (15 * i);
+      // If the next-byte flag is set
+      if ((input[i] & 32768) == 0) {
+        break;
+      }
+    }
+    return value;
+  }
 
-			// If the next-byte flag is set
-			if ((input[offset + i] & 32768) == 0) {
-				break;
-			}
-		}
-		return value;
-	}
+  public static long decodeVarShort(short[] input, int offset) {
+    long value = 0;
+    for (int i = 0; ; i++) {
+      value |= ((long) input[offset + i] & 32767) << (15 * i);
 
-	public static long decodeVarShort(ShortBuffer buffer) {
-		long value = 0;
-		for (int i = 0;; i++) {
-			short current = buffer.get();
-			
-			value |= ((long)current & 32767) << (15 * i);
+      // If the next-byte flag is set
+      if ((input[offset + i] & 32768) == 0) {
+        break;
+      }
+    }
+    return value;
+  }
 
-			// If the next-byte flag is set
-			if ((current & 32768) == 0) {
-				break;
-			}
-		}
-		return value;
-	}
+  public static long decodeVarShort(ShortBuffer buffer) {
+    long value = 0;
+    for (int i = 0; ; i++) {
+      short current = buffer.get();
 
+      value |= ((long) current & 32767) << (15 * i);
+
+      // If the next-byte flag is set
+      if ((current & 32768) == 0) {
+        break;
+      }
+    }
+    return value;
+  }
 }

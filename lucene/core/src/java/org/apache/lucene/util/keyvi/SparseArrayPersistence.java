@@ -26,232 +26,248 @@ import java.nio.ShortBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
-
 import org.apache.lucene.store.DataOutput;
 
+/** Persistence based on a sparse array. */
 public class SparseArrayPersistence implements Closeable {
-	private Path temporaryPath;
-	private int bufferSize;
-	private int flushSize;
-	private byte[] labels;
-	private short[] transitions;
-	private MemoryMapManager transitionsExtern;
-	private MemoryMapManager labelsExtern;
-	private int highestRawWriteBucket;
-	private int inMemoryBufferOffset;
-	private int highestStateBegin;
+  private Path temporaryPath;
+  private int bufferSize;
+  private int flushSize;
+  private byte[] labels;
+  private short[] transitions;
+  private MemoryMapManager transitionsExtern;
+  private MemoryMapManager labelsExtern;
+  private int highestRawWriteBucket;
+  private int inMemoryBufferOffset;
+  private int highestStateBegin;
 
-	public SparseArrayPersistence(int memoryLimit, Path temporaryPath) throws IOException {
-		this.temporaryPath = temporaryPath;
+  public SparseArrayPersistence(int memoryLimit, Path temporaryPath) throws IOException {
+    this.temporaryPath = temporaryPath;
 
-		bufferSize = (int) (memoryLimit / 3); // 3 == sizeof(char) + sizeof(short)
+    bufferSize = memoryLimit / 3; // 3 == sizeof(char) + sizeof(short)
 
-		// align it to 16bit (for fast memcpy)
-		bufferSize += 16 - (bufferSize % 16);
-		flushSize = (bufferSize * 3) / 5;
+    // align it to 16bit (for fast memcpy)
+    bufferSize += 16 - (bufferSize % 16);
+    flushSize = (bufferSize * 3) / 5;
 
-		// align it to 16bit
-		flushSize += 16 - (flushSize % 16);
+    // align it to 16bit
+    flushSize += 16 - (flushSize % 16);
 
-		labels = new byte[bufferSize];
+    labels = new byte[bufferSize];
 
-		Path temporaryDirectory = Files.createTempDirectory(temporaryPath, "dictionary-fsa");
+    Path temporaryDirectory = Files.createTempDirectory(temporaryPath, "dictionary-fsa");
 
-		// size of external memory chunk: not more than 1 or 4 GB
-		int externalMemoryChunkSize = Math.min(flushSize * 2, 1073741824);
+    // size of external memory chunk: not more than 1 or 4 GB
+    int externalMemoryChunkSize = Math.min(flushSize * 2, 1073741824);
 
-		// the chunk size must be a multiplier of the flush_size
-		externalMemoryChunkSize = externalMemoryChunkSize - (externalMemoryChunkSize % flushSize);
+    // the chunk size must be a multiplier of the flush_size
+    externalMemoryChunkSize = externalMemoryChunkSize - (externalMemoryChunkSize % flushSize);
 
-		labelsExtern = new MemoryMapManager(externalMemoryChunkSize, temporaryDirectory, "characterTableFileBuffer");
+    labelsExtern =
+        new MemoryMapManager(
+            externalMemoryChunkSize, temporaryDirectory, "characterTableFileBuffer");
 
-		transitions = new short[bufferSize];
+    transitions = new short[bufferSize];
 
-		transitionsExtern = new MemoryMapManager(externalMemoryChunkSize * 2, temporaryDirectory,
-				"valueTableFileBuffer");
+    transitionsExtern =
+        new MemoryMapManager(
+            externalMemoryChunkSize * 2, temporaryDirectory, "valueTableFileBuffer");
+  }
 
-	}
-	
-	@Override
-	public void close() throws IOException {
-		transitionsExtern.close();
-		labelsExtern.close();
-	}
+  @Override
+  public void close() throws IOException {
+    transitionsExtern.close();
+    labelsExtern.close();
+  }
 
-	public void beginNewState(int offset) {
-		while ((offset + KeyviConstants.COMPACT_SIZE_WINDOW + KeyviConstants.NUMBER_OF_STATE_CODINGS) >= (bufferSize
-				+ inMemoryBufferOffset)) {
-			flushBuffers();
-		}
+  public void beginNewState(int offset) {
+    while ((offset + KeyviConstants.COMPACT_SIZE_WINDOW + KeyviConstants.NUMBER_OF_STATE_CODINGS)
+        >= (bufferSize + inMemoryBufferOffset)) {
+      flushBuffers();
+    }
 
-		if (offset > highestStateBegin) {
-			highestStateBegin = offset;
-		}
-	}
+    if (offset > highestStateBegin) {
+      highestStateBegin = offset;
+    }
+  }
 
-	public void writeTransition(int offset, byte transitionId, short transitionPointer) {
-		highestRawWriteBucket = Math.max(highestRawWriteBucket, offset);
+  public void writeTransition(int offset, byte transitionId, short transitionPointer) {
+    highestRawWriteBucket = Math.max(highestRawWriteBucket, offset);
 
-		if (offset > inMemoryBufferOffset) {
-			labels[offset - inMemoryBufferOffset] = transitionId;
-			transitions[offset - inMemoryBufferOffset] = transitionPointer;
-			return;
-		}
+    if (offset > inMemoryBufferOffset) {
+      labels[offset - inMemoryBufferOffset] = transitionId;
+      transitions[offset - inMemoryBufferOffset] = transitionPointer;
+      return;
+    }
 
-		labelsExtern.getAddressAsByteBuffer(offset).put(transitionId);
-		transitionsExtern.getAddressAsByteBuffer(offset * 2).asShortBuffer().put(transitionPointer);
-	}
+    labelsExtern.getAddressAsByteBuffer(offset).put(transitionId);
+    transitionsExtern.getAddressAsByteBuffer(offset * 2).asShortBuffer().put(transitionPointer);
+  }
 
-	public int readTransitionLabel(int offset) {
-		if (offset >= inMemoryBufferOffset) {
-			return labels[offset - inMemoryBufferOffset];
-		}
-		return labelsExtern.getAddressAsByteBuffer(offset).get();
-	}
+  public int readTransitionLabel(int offset) {
+    if (offset >= inMemoryBufferOffset) {
+      return labels[offset - inMemoryBufferOffset];
+    }
+    return labelsExtern.getAddressAsByteBuffer(offset).get();
+  }
 
-	public short readTransitionValue(int offset) {
-		if (offset >= inMemoryBufferOffset) {
-			return transitions[offset - inMemoryBufferOffset];
-		}
-		
-		return transitionsExtern.getAddressAsByteBuffer(offset * 2).asShortBuffer().get();
-	}
+  public short readTransitionValue(int offset) {
+    if (offset >= inMemoryBufferOffset) {
+      return transitions[offset - inMemoryBufferOffset];
+    }
 
-	public int resolveTransitionValue(int offset, int value) {
-		int pt = value;
-		int resolved_ptr;
+    return transitionsExtern.getAddressAsByteBuffer(offset * 2).asShortBuffer().get();
+  }
 
-		if ((pt & 0xC000) == 0xC000) {
-			// compact transition uint16 absolute
+  public int resolveTransitionValue(int offset, int value) {
+    int pt = value;
+    int resolved_ptr;
 
-			resolved_ptr = pt & 0x3FFF;
-			return resolved_ptr;
-		}
+    if ((pt & 0xC000) == 0xC000) {
+      // compact transition uint16 absolute
 
-		if ((pt & 0x8000) > 0) {
-			// clear the first bit
-			pt &= 0x7FFF;
-			int overflow_bucket = (pt >> 4) + offset - KeyviConstants.COMPACT_SIZE_WINDOW;
+      resolved_ptr = pt & 0x3FFF;
+      return resolved_ptr;
+    }
 
-			if (overflow_bucket >= inMemoryBufferOffset) {
-				resolved_ptr = (int) VInt.decodeVarShort(transitions, overflow_bucket - inMemoryBufferOffset);
+    if ((pt & 0x8000) > 0) {
+      // clear the first bit
+      pt &= 0x7FFF;
+      int overflow_bucket = (pt >> 4) + offset - KeyviConstants.COMPACT_SIZE_WINDOW;
 
-			} else {
-	      // value needs to be read from external storage, which in 99.9% is a trivial access to the mmap'ed area
-	      // but in rare cases might be spread across 2 chunks, for the chunk border test we assume worst case 3 varshorts
-	      // to be read, that is a maximum of 2**45, so together with shifting 2**48 == 256 TB of addressable space
-				if (transitionsExtern.getAddressQuickTestOk(overflow_bucket * 2, 3 * 2)) {
-					ShortBuffer buffer = transitionsExtern.getAddressAsByteBuffer(overflow_bucket * 2).asShortBuffer();
+      if (overflow_bucket >= inMemoryBufferOffset) {
+        resolved_ptr =
+            (int) VInt.decodeVarShort(transitions, overflow_bucket - inMemoryBufferOffset);
 
-					resolved_ptr = (int) VInt.decodeVarShort(buffer);
-				} else {
-					// value might be on the chunk border, take a secure approach
-          ShortBuffer buffer = transitionsExtern
-              .getBuffer(overflow_bucket * 2, 3 * 2).asShortBuffer();
+      } else {
+        // value needs to be read from external storage, which in 99.9% is a trivial access to the
+        // mmap'ed area
+        // but in rare cases might be spread across 2 chunks, for the chunk border test we assume
+        // worst case 3 varshorts
+        // to be read, that is a maximum of 2**45, so together with shifting 2**48 == 256 TB of
+        // addressable space
+        if (transitionsExtern.getAddressQuickTestOk(overflow_bucket * 2, 3 * 2)) {
+          ShortBuffer buffer =
+              transitionsExtern.getAddressAsByteBuffer(overflow_bucket * 2).asShortBuffer();
 
-					resolved_ptr = (int) VInt.decodeVarShort(buffer);
-				}
-			}
+          resolved_ptr = (int) VInt.decodeVarShort(buffer);
+        } else {
+          // value might be on the chunk border, take a secure approach
+          ShortBuffer buffer =
+              transitionsExtern.getBuffer(overflow_bucket * 2, 3 * 2).asShortBuffer();
 
-			resolved_ptr = (resolved_ptr << 3) + (pt & 0x7);
+          resolved_ptr = (int) VInt.decodeVarShort(buffer);
+        }
+      }
 
-			if ((pt & 0x8) > 0) {
-				// relative coding
-				resolved_ptr = offset - resolved_ptr + KeyviConstants.COMPACT_SIZE_WINDOW;
-			}
+      resolved_ptr = (resolved_ptr << 3) + (pt & 0x7);
 
-		} else {
-			resolved_ptr = offset - pt + KeyviConstants.COMPACT_SIZE_WINDOW;
-		}
+      if ((pt & 0x8) > 0) {
+        // relative coding
+        resolved_ptr = offset - resolved_ptr + KeyviConstants.COMPACT_SIZE_WINDOW;
+      }
 
-		return resolved_ptr;
-	}
+    } else {
+      resolved_ptr = offset - pt + KeyviConstants.COMPACT_SIZE_WINDOW;
+    }
 
-	public int readFinalValue(int offset) {
-		if (offset + KeyviConstants.FINAL_OFFSET_TRANSITION >= inMemoryBufferOffset) {
+    return resolved_ptr;
+  }
 
-			return (int) VInt.decodeVarShort(transitions,
-					offset - inMemoryBufferOffset + KeyviConstants.FINAL_OFFSET_TRANSITION);
-		}
+  public int readFinalValue(int offset) {
+    if (offset + KeyviConstants.FINAL_OFFSET_TRANSITION >= inMemoryBufferOffset) {
 
-		if (transitionsExtern.getAddressQuickTestOk((offset + KeyviConstants.FINAL_OFFSET_TRANSITION) * 2, 5)) {
-			ShortBuffer buffer = transitionsExtern
-          .getAddressAsByteBuffer((offset + KeyviConstants.FINAL_OFFSET_TRANSITION) * 2).asShortBuffer();
+      return (int)
+          VInt.decodeVarShort(
+              transitions, offset - inMemoryBufferOffset + KeyviConstants.FINAL_OFFSET_TRANSITION);
+    }
 
-			return (int) VInt.decodeVarShort(buffer);
-		}
+    if (transitionsExtern.getAddressQuickTestOk(
+        (offset + KeyviConstants.FINAL_OFFSET_TRANSITION) * 2, 5)) {
+      ShortBuffer buffer =
+          transitionsExtern
+              .getAddressAsByteBuffer((offset + KeyviConstants.FINAL_OFFSET_TRANSITION) * 2)
+              .asShortBuffer();
 
-		// value might be on the chunk border, take a secure approach
-		ShortBuffer buffer = transitionsExtern.getBuffer((offset + KeyviConstants.FINAL_OFFSET_TRANSITION) * 2,
-        20).asShortBuffer();
+      return (int) VInt.decodeVarShort(buffer);
+    }
 
-		
-		return (int) VInt.decodeVarShort(buffer);
-	}
-	
-	public int GetChunkSizeExternalTransitions() {
-	  return transitionsExtern.getChunkSize();
-	}
+    // value might be on the chunk border, take a secure approach
+    ShortBuffer buffer =
+        transitionsExtern
+            .getBuffer((offset + KeyviConstants.FINAL_OFFSET_TRANSITION) * 2, 20)
+            .asShortBuffer();
 
-	/**
-	 * Flush all internal buffers
-	 */
-	public void flush() {
-		// make idempotent, so it can be called twice or more);
-		if (labels != null) {
-			int highestWritePosition = Math.max(highestStateBegin + KeyviConstants.MAX_TRANSITIONS_OF_A_STATE,
-					highestRawWriteBucket + 1);
+    return (int) VInt.decodeVarShort(buffer);
+  }
 
-			labelsExtern.append(labels, highestWritePosition - inMemoryBufferOffset);
+  public int GetChunkSizeExternalTransitions() {
+    return transitionsExtern.getChunkSize();
+  }
 
-			transitionsExtern.append(transitions, highestWritePosition - inMemoryBufferOffset);
+  /** Flush all internal buffers */
+  public void flush() {
+    // make idempotent, so it can be called twice or more);
+    if (labels != null) {
+      int highestWritePosition =
+          Math.max(
+              highestStateBegin + KeyviConstants.MAX_TRANSITIONS_OF_A_STATE,
+              highestRawWriteBucket + 1);
 
-			labels = null;
-			transitions = null;
-		}
-	}
+      labelsExtern.append(labels, highestWritePosition - inMemoryBufferOffset);
 
-	public void write(DataOutput out) throws IOException {
-	  int highestWritePosition = Math.max(highestStateBegin + KeyviConstants.MAX_TRANSITIONS_OF_A_STATE,
-        highestRawWriteBucket + 1);
-	  
-	  // version
-	  out.writeVInt(2);
-	  out.writeVInt(highestWritePosition);
-	  labelsExtern.write(out, highestWritePosition);
-	  transitionsExtern.write(out, highestWritePosition * 2);
-	}
-	
-	public void writeKeyvi(OutputStream stream) throws IOException {
-		int highestWritePosition = Math.max(highestStateBegin + KeyviConstants.MAX_TRANSITIONS_OF_A_STATE,
-				highestRawWriteBucket + 1);
+      transitionsExtern.append(transitions, highestWritePosition - inMemoryBufferOffset);
 
-		String properties = "{\"version\":\"" + 2 + "\", \"size\":\"" + highestWritePosition + "\"}";
+      labels = null;
+      transitions = null;
+    }
+  }
 
-		byte[] propertiesBytes = properties.getBytes(UTF_8);
-		
-		// todo: re-factor, writing 32bit int
-		stream.write((propertiesBytes.length >>> 24) & 0xFF);
-		stream.write((propertiesBytes.length >>> 16) & 0xFF);
-		stream.write((propertiesBytes.length >>> 8) & 0xFF);
-		stream.write(propertiesBytes.length & 0xFF);
-		
-		stream.write(propertiesBytes);
+  public void write(DataOutput out) throws IOException {
+    int highestWritePosition =
+        Math.max(
+            highestStateBegin + KeyviConstants.MAX_TRANSITIONS_OF_A_STATE,
+            highestRawWriteBucket + 1);
 
-		labelsExtern.write(stream, highestWritePosition);
-		transitionsExtern.write(stream, highestWritePosition * 2);
-	}
+    // version
+    out.writeVInt(2);
+    out.writeVInt(highestWritePosition);
+    labelsExtern.write(out, highestWritePosition);
+    transitionsExtern.write(out, highestWritePosition * 2);
+  }
 
-	private void flushBuffers() {
-		labelsExtern.append(labels, flushSize);
-		transitionsExtern.append(transitions, flushSize);
+  public void writeKeyvi(OutputStream stream) throws IOException {
+    int highestWritePosition =
+        Math.max(
+            highestStateBegin + KeyviConstants.MAX_TRANSITIONS_OF_A_STATE,
+            highestRawWriteBucket + 1);
 
-		int overlap = bufferSize - flushSize;
-		System.arraycopy(labels, flushSize, labels, 0, overlap);
-		System.arraycopy(transitions, flushSize, transitions, 0, overlap);
-		Arrays.fill(labels, overlap, labels.length, (byte) 0);
-		Arrays.fill(transitions, overlap, labels.length, (short) 0);
+    String properties = "{\"version\":\"" + 2 + "\", \"size\":\"" + highestWritePosition + "\"}";
 
-		inMemoryBufferOffset += flushSize;
-	}
+    byte[] propertiesBytes = properties.getBytes(UTF_8);
+
+    // todo: re-factor, writing 32bit int
+    stream.write((propertiesBytes.length >>> 24) & 0xFF);
+    stream.write((propertiesBytes.length >>> 16) & 0xFF);
+    stream.write((propertiesBytes.length >>> 8) & 0xFF);
+    stream.write(propertiesBytes.length & 0xFF);
+
+    stream.write(propertiesBytes);
+
+    labelsExtern.write(stream, highestWritePosition);
+    transitionsExtern.write(stream, highestWritePosition * 2);
+  }
+
+  private void flushBuffers() {
+    labelsExtern.append(labels, flushSize);
+    transitionsExtern.append(transitions, flushSize);
+
+    int overlap = bufferSize - flushSize;
+    System.arraycopy(labels, flushSize, labels, 0, overlap);
+    System.arraycopy(transitions, flushSize, transitions, 0, overlap);
+    Arrays.fill(labels, overlap, labels.length, (byte) 0);
+    Arrays.fill(transitions, overlap, labels.length, (short) 0);
+
+    inMemoryBufferOffset += flushSize;
+  }
 }

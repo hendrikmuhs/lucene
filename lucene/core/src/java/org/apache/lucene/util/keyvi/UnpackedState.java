@@ -17,7 +17,9 @@
 
 package org.apache.lucene.util.keyvi;
 
+/** Class representing a state that has not been packed(into the sparse array) yet. */
 public final class UnpackedState {
+  /** Data structure representing an outgoing edge (transition) of a state. */
   public final class Transition {
     private int label;
     private int value;
@@ -152,6 +154,7 @@ public final class UnpackedState {
     return zeroByteLabel;
   }
 
+  @Override
   public int hashCode() {
     if (this.hashCode == -1) {
       int b;
@@ -207,8 +210,7 @@ public final class UnpackedState {
 
   public boolean equals(PackedState.Key packed) {
     // First filter - check if hash code and the number of transitions is the same
-    if (packed.hashCode() != hashCode()
-        || packed.getNumberOfOutgoingTransitions() != used) {
+    if (packed.hashCode() != hashCode() || packed.getNumberOfOutgoingTransitions() != used) {
       return false;
     }
 
@@ -231,7 +233,8 @@ public final class UnpackedState {
         }
       } else // (label == FINAL_OFFSET_TRANSITION)
       {
-        if (persistence.readTransitionLabel(packed.getOffset() + label) != KeyviConstants.FINAL_OFFSET_CODE) {
+        if (persistence.readTransitionLabel(packed.getOffset() + label)
+            != KeyviConstants.FINAL_OFFSET_CODE) {
           return false;
         }
 
@@ -245,7 +248,8 @@ public final class UnpackedState {
       //// This transition is ok.
     }
 
-    // note: we do not compare the weight entry because if one state has weight and the other not the hashes differ
+    // note: we do not compare the weight entry because if one state has weight and the other not
+    // the hashes differ
 
     // all checks succeeded, states must be equal.
     return true;
@@ -267,15 +271,16 @@ public final class UnpackedState {
 
     UnpackedState other = (UnpackedState) obj;
 
-    if ((this.persistence == other.persistence &&
-        this.bitVector == other.bitVector
-        && this.used == other.used
-        && this.noMinimizationCounter == other.noMinimizationCounter
-        && this.weight == other.weight
-        && this.zeroByteState == other.zeroByteState
-        && this.zeroByteLabel == other.zeroByteLabel
-        && this.finalState == other.finalState
-        && this.outgoing.length == other.outgoing.length) == false) {
+    if ((this.persistence == other.persistence
+            && this.bitVector == other.bitVector
+            && this.used == other.used
+            && this.noMinimizationCounter == other.noMinimizationCounter
+            && this.weight == other.weight
+            && this.zeroByteState == other.zeroByteState
+            && this.zeroByteLabel == other.zeroByteLabel
+            && this.finalState == other.finalState
+            && this.outgoing.length == other.outgoing.length)
+        == false) {
       return false;
     }
 

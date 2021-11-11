@@ -20,7 +20,6 @@ package org.apache.lucene.util.keyvi;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-
 import org.apache.lucene.util.LuceneTestCase;
 
 public class TestSparseArrayBuilder extends LuceneTestCase {
@@ -267,7 +266,8 @@ public class TestSparseArrayBuilder extends LuceneTestCase {
     assertTrue(p.readTransitionLabel(1000005) != 0);
   }
 
-  public void testWriteTransitionRelativeOverflowZerobyteEdgecaseStartPositions() throws IOException {
+  public void testWriteTransitionRelativeOverflowZerobyteEdgecaseStartPositions()
+      throws IOException {
     Path temporaryDirectory = Files.createTempDirectory("dictionary-fsa-unittest");
     SparseArrayPersistence p = new SparseArrayPersistence(64000, temporaryDirectory);
 
@@ -315,8 +315,10 @@ public class TestSparseArrayBuilder extends LuceneTestCase {
     b.updateWeightIfNeeded(1000000, 42);
     b.takenPositionsInSparsearray.set(1000000 + KeyviConstants.INNER_WEIGHT_TRANSITION_COMPACT);
 
-    assertEquals(0, p.readTransitionLabel(1000000 + KeyviConstants.INNER_WEIGHT_TRANSITION_COMPACT));
-    assertTrue(b.stateStartPositions.isSet(1000000 + KeyviConstants.INNER_WEIGHT_TRANSITION_COMPACT));
+    assertEquals(
+        0, p.readTransitionLabel(1000000 + KeyviConstants.INNER_WEIGHT_TRANSITION_COMPACT));
+    assertTrue(
+        b.stateStartPositions.isSet(1000000 + KeyviConstants.INNER_WEIGHT_TRANSITION_COMPACT));
   }
 
   public void testWriteTransitionFinalStateTransition() throws IOException {
@@ -345,7 +347,8 @@ public class TestSparseArrayBuilder extends LuceneTestCase {
   public void testWriteTransitionExternalMemory() throws IOException {
     Path temporaryDirectory = Files.createTempDirectory("dictionary-fsa-unittest");
     int memoryLimitPersistence = 64000;
-    SparseArrayPersistence p = new SparseArrayPersistence(memoryLimitPersistence, temporaryDirectory);
+    SparseArrayPersistence p =
+        new SparseArrayPersistence(memoryLimitPersistence, temporaryDirectory);
 
     SparseArrayBuilder b = new SparseArrayBuilder(1024 * 1024, p, false, true);
 
@@ -375,7 +378,8 @@ public class TestSparseArrayBuilder extends LuceneTestCase {
   public void testWriteTransitionChunkBorder() throws IOException {
     Path temporaryDirectory = Files.createTempDirectory("dictionary-fsa-unittest");
     int memoryLimitPersistence = 64000;
-    SparseArrayPersistence p = new SparseArrayPersistence(memoryLimitPersistence, temporaryDirectory);
+    SparseArrayPersistence p =
+        new SparseArrayPersistence(memoryLimitPersistence, temporaryDirectory);
 
     SparseArrayBuilder b = new SparseArrayBuilder(1024 * 1024, p, false, true);
 
@@ -402,5 +406,4 @@ public class TestSparseArrayBuilder extends LuceneTestCase {
     short value = p.readTransitionValue(offset - 3);
     assertEquals(offset - 80000, p.resolveTransitionValue(offset - 3, value));
   }
-
 }

@@ -19,6 +19,10 @@ package org.apache.lucene.util.keyvi;
 
 import org.apache.lucene.util.keyvi.UnpackedState.Transition;
 
+/**
+ * Sparse array builder implementation. The builder finds free spots to store outgoing edges of a
+ * state.
+ */
 public class SparseArrayBuilder {
 
   private SparseArrayPersistence persistence;
@@ -32,13 +36,17 @@ public class SparseArrayBuilder {
   SlidingWindowBitVectorPositionTracker takenPositionsInSparsearray;
   private SlidingWindowBitVectorPositionTracker zeroByteScramblingStateStartPositions;
 
-  public SparseArrayBuilder(long memoryLimit, SparseArrayPersistence persistence, boolean innerWeight,
-      boolean minimize) {
+  // buffer for re-usage
+  private short[] shortBuffer = new short[8];
+
+  public SparseArrayBuilder(
+      long memoryLimit, SparseArrayPersistence persistence, boolean innerWeight, boolean minimize) {
     this.persistence = persistence;
     this.innerWeight = innerWeight;
     this.minimize = minimize;
     this.packedState = new PackedState();
-    this.stateHashTable = new LeastRecentlyUsedGenerationsCache<PackedState>(packedState, memoryLimit);
+    this.stateHashTable =
+        new LeastRecentlyUsedGenerationsCache<PackedState>(packedState, memoryLimit);
     stateStartPositions = new SlidingWindowBitVectorPositionTracker();
     takenPositionsInSparsearray = new SlidingWindowBitVectorPositionTracker();
     zeroByteScramblingStateStartPositions = new SlidingWindowBitVectorPositionTracker();
@@ -70,7 +78,8 @@ public class SparseArrayBuilder {
     writeState((int) offset, unpackedState);
     ++numerOfStates;
 
-    PackedState.Key key = existingState.new Key((int) offset, unpackedState.hashCode(), unpackedState.size());
+    PackedState.Key key =
+        existingState.new Key((int) offset, unpackedState.hashCode(), unpackedState.size());
 
     // if minimization failed several time in a row while the minimization hash has
     // decent amount of data,
@@ -91,14 +100,16 @@ public class SparseArrayBuilder {
   }
 
   long findFreeBucket(UnpackedState unpackedState) {
-    long startPosition = highestPersistedState > KeyviConstants.SPARSE_ARRAY_SEARCH_OFFSET
-        ? highestPersistedState - KeyviConstants.SPARSE_ARRAY_SEARCH_OFFSET
-        : 1;
+    long startPosition =
+        highestPersistedState > KeyviConstants.SPARSE_ARRAY_SEARCH_OFFSET
+            ? highestPersistedState - KeyviConstants.SPARSE_ARRAY_SEARCH_OFFSET
+            : 1;
 
     // further shift it taking the first outgoing transition and find the slot where
     // it fits in
-    startPosition = takenPositionsInSparsearray.nextFreeSlot(startPosition + unpackedState.get(0).getLabel())
-        - unpackedState.get(0).getLabel();
+    startPosition =
+        takenPositionsInSparsearray.nextFreeSlot(startPosition + unpackedState.get(0).getLabel())
+            - unpackedState.get(0).getLabel();
 
     do {
       startPosition = stateStartPositions.nextFreeSlot(startPosition);
@@ -118,7 +129,8 @@ public class SparseArrayBuilder {
         }
       }
 
-      int shift = takenPositionsInSparsearray.isAvailable(unpackedState.getBitVector(), startPosition);
+      int shift =
+          takenPositionsInSparsearray.isAvailable(unpackedState.getBitVector(), startPosition);
 
       if (shift == 0) {
         // check for potential conflict with existing state which could become final if
@@ -133,13 +145,16 @@ public class SparseArrayBuilder {
           continue;
         }
 
-        if (unpackedState.get(0).getLabel() != 0 && !takenPositionsInSparsearray.isSet(startPosition)) {
+        if (unpackedState.get(0).getLabel() != 0
+            && !takenPositionsInSparsearray.isSet(startPosition)) {
           // need special handling for zero-byte state, position
 
           // state has no 0-byte, we have to 'scramble' the 0-byte to avoid a ghost state
           if (startPosition >= KeyviConstants.NUMBER_OF_STATE_CODINGS) {
-            int zerobyteScramblingState = (int) stateStartPositions
-                .nextFreeSlot(startPosition - KeyviConstants.NUMBER_OF_STATE_CODINGS);
+            int zerobyteScramblingState =
+                (int)
+                    stateStartPositions.nextFreeSlot(
+                        startPosition - KeyviConstants.NUMBER_OF_STATE_CODINGS);
 
             if (zerobyteScramblingState >= startPosition) {
               // unable to scramble zero byte position
@@ -150,7 +165,8 @@ public class SparseArrayBuilder {
             byte zerobyteScramblingLabel = (byte) (startPosition - zerobyteScramblingState);
             // avoid finalizing a state by mistake
             if (zerobyteScramblingLabel == KeyviConstants.FINAL_OFFSET_CODE
-                && stateStartPositions.isSet(startPosition - KeyviConstants.NUMBER_OF_STATE_CODINGS)) {
+                && stateStartPositions.isSet(
+                    startPosition - KeyviConstants.NUMBER_OF_STATE_CODINGS)) {
               // unable to scramble zero byte position (state finalization), continue search
               ++startPosition;
               continue;
@@ -170,7 +186,6 @@ public class SparseArrayBuilder {
 
       startPosition += shift;
     } while (true);
-
   }
 
   void writeState(int offset, UnpackedState unpackedState) {
@@ -206,7 +221,8 @@ public class SparseArrayBuilder {
       // first bit is a 0 byte, so check [1]
       // make sure no other state is placed at offset - 256, which could cause
       // interference
-      if (unpackedState.size() > 1 && (unpackedState.get(1).getLabel() == 1)
+      if (unpackedState.size() > 1
+          && (unpackedState.get(1).getLabel() == 1)
           && offset >= KeyviConstants.NUMBER_OF_STATE_CODINGS) {
         stateStartPositions.set(offset - KeyviConstants.NUMBER_OF_STATE_CODINGS);
       }
@@ -246,17 +262,21 @@ public class SparseArrayBuilder {
       // as all states have this, no need to code it specially
       updateWeightIfNeeded(offset, weight);
     }
-
   }
 
   void updateWeightIfNeeded(int offset, int weight) {
 
-    short newWeight = (short) (weight < KeyviConstants.COMPACT_SIZE_INNER_WEIGHT_MAX_VALUE ? weight
-        : KeyviConstants.COMPACT_SIZE_INNER_WEIGHT_MAX_VALUE);
+    short newWeight =
+        (short)
+            (weight < KeyviConstants.COMPACT_SIZE_INNER_WEIGHT_MAX_VALUE
+                ? weight
+                : KeyviConstants.COMPACT_SIZE_INNER_WEIGHT_MAX_VALUE);
 
-    if (persistence.readTransitionValue(offset + KeyviConstants.INNER_WEIGHT_TRANSITION_COMPACT) < newWeight) {
+    if (persistence.readTransitionValue(offset + KeyviConstants.INNER_WEIGHT_TRANSITION_COMPACT)
+        < newWeight) {
 
-      persistence.writeTransition(offset + KeyviConstants.INNER_WEIGHT_TRANSITION_COMPACT, (byte) 0, newWeight);
+      persistence.writeTransition(
+          offset + KeyviConstants.INNER_WEIGHT_TRANSITION_COMPACT, (byte) 0, newWeight);
       // it might be, that the slot is not taken yet
       takenPositionsInSparsearray.set(offset + KeyviConstants.INNER_WEIGHT_TRANSITION_COMPACT);
 
@@ -268,19 +288,19 @@ public class SparseArrayBuilder {
   /**
    * Compact Encode for ushorts
    *
-   * bit 1 0: value fits into bits 1-16 (value <32768) 1: overflow encoding 2 0: overflow encoding 1: absolute value
-   * fits in bits 2-16 (value<16384)
+   * <p>bit 1 0: value fits into bits 1-16 (value <32768) 1: overflow encoding 2 0: overflow
+   * encoding 1: absolute value fits in bits 2-16 (value<16384)
    *
-   * compact (0x): value is the difference of offset + 1024 - transitionPointer
+   * <p>compact (0x): value is the difference of offset + 1024 - transitionPointer
    *
-   * absolute compact (11): value is the absolute address coded in bits 2-16
+   * <p>absolute compact (11): value is the absolute address coded in bits 2-16
    *
-   * overflow: (10)
+   * <p>overflow: (10)
    *
-   * bits 3-12 pointer to extra bucket in the range -512 -> +511 from transitionPointer bit 13 whether pointer is
-   * absolute(0) or relative(1) bits 14-16 lower part (3 bits) of absolute value coded in extra bucket extra bucket:
-   * variable length encoded absolute address of transition Pointer, higher bits
-   *
+   * <p>bits 3-12 pointer to extra bucket in the range -512 -> +511 from transitionPointer bit 13
+   * whether pointer is absolute(0) or relative(1) bits 14-16 lower part (3 bits) of absolute value
+   * coded in extra bucket extra bucket: variable length encoded absolute address of transition
+   * Pointer, higher bits
    */
   void writeTransition(int offset, byte transitionId, int transitionPointer) {
 
@@ -324,19 +344,22 @@ public class SparseArrayBuilder {
     int vshortSize = VInt.encodeVarShort(transitionPointerHigh, vshortPointer);
 
     // find free spots in the sparse array where the pointer fits in
-    int startPosition = offset > KeyviConstants.COMPACT_SIZE_WINDOW ? offset - KeyviConstants.COMPACT_SIZE_WINDOW
-        : 0;
+    int startPosition =
+        offset > KeyviConstants.COMPACT_SIZE_WINDOW
+            ? offset - KeyviConstants.COMPACT_SIZE_WINDOW
+            : 0;
     int zerobyteScramblingState = 0;
     byte zerobyteScramblingLabel = (byte) 0xff;
 
-    for (;;) {
+    for (; ; ) {
       startPosition = (int) takenPositionsInSparsearray.nextFreeSlot(startPosition);
 
       // prevent that states without a weight get a 'zombie weight'.
       // check that we do not write into a bucket that is used for an inner weight of
       // another transition
       if (innerWeight
-          && stateStartPositions.isSet(startPosition + KeyviConstants.INNER_WEIGHT_TRANSITION_COMPACT)) {
+          && stateStartPositions.isSet(
+              startPosition + KeyviConstants.INNER_WEIGHT_TRANSITION_COMPACT)) {
 
         startPosition += 1;
         continue;
@@ -358,8 +381,9 @@ public class SparseArrayBuilder {
         }
         // check that we do not write into a bucket that is used for an inner weight of
         // another transition
-        if (innerWeight && stateStartPositions
-            .isSet(startPosition + foundSlots - KeyviConstants.INNER_WEIGHT_TRANSITION_COMPACT)) {
+        if (innerWeight
+            && stateStartPositions.isSet(
+                startPosition + foundSlots - KeyviConstants.INNER_WEIGHT_TRANSITION_COMPACT)) {
           // found clash wrt. weight transition, skipping
 
           startPosition += foundSlots + 1;
@@ -370,8 +394,10 @@ public class SparseArrayBuilder {
 
       if (foundSlots > 0 && startPosition >= KeyviConstants.NUMBER_OF_STATE_CODINGS) {
         // ensure enough space: if vshort has length 2, label must start from 0xfe
-        zerobyteScramblingState = (int) stateStartPositions
-            .nextFreeSlot(startPosition + vshortSize - KeyviConstants.NUMBER_OF_STATE_CODINGS - 1);
+        zerobyteScramblingState =
+            (int)
+                stateStartPositions.nextFreeSlot(
+                    startPosition + vshortSize - KeyviConstants.NUMBER_OF_STATE_CODINGS - 1);
 
         if (zerobyteScramblingState >= startPosition) {
           // did not find a state to scramble zero-bytes, no good start position, skipping
@@ -405,7 +431,8 @@ public class SparseArrayBuilder {
     // write the overflow pointer using scrambled zerobyte labels
     for (int i = 0; i < vshortSize; ++i) {
       takenPositionsInSparsearray.set(startPosition + i);
-      persistence.writeTransition(startPosition + i, (byte) (zerobyteScramblingLabel + i), vshortPointer[i]);
+      persistence.writeTransition(
+          startPosition + i, (byte) (zerobyteScramblingLabel + i), vshortPointer[i]);
     }
 
     // encode the pointer to that bucket
@@ -419,15 +446,13 @@ public class SparseArrayBuilder {
   }
 
   void writeFinalTransition(int offset, long value) {
-
-    // todo: do not re-create every time
-    short[] shortBuffer = new short[8];
-
     int varShortSize = VInt.encodeVarShort(value, shortBuffer);
 
     for (int i = 0; i < varShortSize; ++i) {
-      persistence.writeTransition(offset + KeyviConstants.FINAL_OFFSET_TRANSITION + i,
-          (byte) (KeyviConstants.FINAL_OFFSET_CODE + i), shortBuffer[i]);
+      persistence.writeTransition(
+          offset + KeyviConstants.FINAL_OFFSET_TRANSITION + i,
+          (byte) (KeyviConstants.FINAL_OFFSET_CODE + i),
+          shortBuffer[i]);
     }
   }
 }

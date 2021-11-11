@@ -17,17 +17,16 @@
 
 package org.apache.lucene.util.keyvi;
 
+import static java.nio.charset.StandardCharsets.*;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.store.IndexOutput;
 import org.apache.lucene.util.LuceneTestCase;
-
-import static java.nio.charset.StandardCharsets.*;
 
 public class TestGenerator extends LuceneTestCase {
 
@@ -62,7 +61,7 @@ public class TestGenerator extends LuceneTestCase {
     g.writeKeyvi(stream);
     g.close();
   }
-  
+
   public void testSimple() throws IOException {
 
     Generator g = new Generator();
@@ -81,11 +80,11 @@ public class TestGenerator extends LuceneTestCase {
     out.close();
     IndexInput in = dir.openInput("keyvi", IOContext.DEFAULT);
 
-    Automata automata = new Automata (in);
+    Automata automata = new Automata(in);
 
     assertEquals(5, automata.getNumberOfKeys());
     int startState = automata.getStartState();
-    byte [] k = "aaaa".getBytes(UTF_8);
+    byte[] k = "aaaa".getBytes(UTF_8);
 
     int state = automata.tryWalkTransition(startState, k[0]);
     assertTrue(state > 0);

@@ -20,30 +20,28 @@ package org.apache.lucene.util.keyvi;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-
 import org.apache.lucene.util.LuceneTestCase;
 
 public class TestSparseArrayPersistence extends LuceneTestCase {
 
-	public void testBasic() throws IOException {
-		int memoryLimit = 1024 * 1024;
-		Path temporaryDirectory = Files.createTempDirectory("dictionary-fsa-unittest");
+  public void testBasic() throws IOException {
+    int memoryLimit = 1024 * 1024;
+    Path temporaryDirectory = Files.createTempDirectory("dictionary-fsa-unittest");
 
-		SparseArrayPersistence p = new SparseArrayPersistence(memoryLimit, temporaryDirectory);
+    SparseArrayPersistence p = new SparseArrayPersistence(memoryLimit, temporaryDirectory);
 
-		p.writeTransition(1, (byte) 42, (short) 43);
-		p.writeTransition(200, (byte) 44, (short) 45);
-		assertEquals(42, p.readTransitionLabel(1));
-		assertEquals(43, p.readTransitionValue(1));
-		assertEquals(44, p.readTransitionLabel(200));
-		assertEquals(45, p.readTransitionValue(200));
+    p.writeTransition(1, (byte) 42, (short) 43);
+    p.writeTransition(200, (byte) 44, (short) 45);
+    assertEquals(42, p.readTransitionLabel(1));
+    assertEquals(43, p.readTransitionValue(1));
+    assertEquals(44, p.readTransitionLabel(200));
+    assertEquals(45, p.readTransitionValue(200));
 
-		// enforce flush in persistence
-		p.beginNewState(memoryLimit * 20);
-		assertEquals(42, p.readTransitionLabel(1));
-		assertEquals(43, p.readTransitionValue(1));
-		assertEquals(44, p.readTransitionLabel(200));
-		assertEquals(45, p.readTransitionValue(200));
-	}
-
+    // enforce flush in persistence
+    p.beginNewState(memoryLimit * 20);
+    assertEquals(42, p.readTransitionLabel(1));
+    assertEquals(43, p.readTransitionValue(1));
+    assertEquals(44, p.readTransitionLabel(200));
+    assertEquals(45, p.readTransitionValue(200));
+  }
 }

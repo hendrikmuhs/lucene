@@ -14,4 +14,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/**
+ * Alternative finite state transducers
+ *
+ * <p>This package implements a port of <a href="http://keyvi.org">Keyvi Finite State
+ * Transducers</a>.
+ */
 package org.apache.lucene.util.keyvi;

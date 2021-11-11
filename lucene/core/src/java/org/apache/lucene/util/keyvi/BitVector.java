@@ -19,10 +19,10 @@ package org.apache.lucene.util.keyvi;
 
 import java.util.Arrays;
 
-/*
+/**
  * A bitvector implementation with a fixed length and special methods for finding free slots.
- * 
- * (unfortunately java.util.BitSet lacks functionality we need here)
+ *
+ * <p>(unfortunately java.util.BitSet lacks functionality we need here)
  */
 public class BitVector {
 
@@ -42,11 +42,9 @@ public class BitVector {
 
   /**
    * Sets all bits of the given bitvector
-   * 
-   * @param other
-   *          a bitvector
-   * @param startBit
-   *          the start position to set the vector
+   *
+   * @param other a bitvector
+   * @param startBit the start position to set the vector
    */
   public void setVector(BitVector other, int startBit) {
     int bytePosition = startBit >> 6;
@@ -61,7 +59,8 @@ public class BitVector {
     } else {
       bits[bytePosition] |= (other.bits[0] << bitPosition);
       for (int i = 1; i < writeLength; ++i) {
-        bits[bytePosition + i] |= ((other.bits[i] << bitPosition) | (other.bits[i - 1] >>> (64 - bitPosition)));
+        bits[bytePosition + i] |=
+            ((other.bits[i] << bitPosition) | (other.bits[i - 1] >>> (64 - bitPosition)));
       }
 
       if (bytePosition + writeLength < bits.length) {
@@ -72,11 +71,9 @@ public class BitVector {
 
   /**
    * Sets all bits of the given bitvector
-   * 
-   * @param other
-   *          a BitVector
-   * @param startBitOther
-   *          the start position in the given bitvector to use
+   *
+   * @param other a BitVector
+   * @param startBitOther the start position in the given bitvector to use
    */
   public void setVectorAndShiftOther(BitVector other, int startBitOther) {
     int bytePositionOther = startBitOther >> 6;
@@ -91,9 +88,8 @@ public class BitVector {
 
   /**
    * Clear a bit, set it to 0.
-   * 
-   * @param bit
-   *          the bit to erase.
+   *
+   * @param bit the bit to erase.
    */
   public void Clear(int bit) {
     bits[bit >> 6] &= (~(1l << (bit & 63)));
@@ -102,8 +98,7 @@ public class BitVector {
   /**
    * Gets the state of the given bit
    *
-   * @param bit
-   *          the bit
+   * @param bit the bit
    * @return True if set, false otherwise.
    */
   public boolean get(int bit) {
@@ -112,9 +107,8 @@ public class BitVector {
 
   /**
    * Get the next non set bit in the bitvector starting from the given position.
-   * 
-   * @param startBit
-   *          the bit to start searching from
+   *
+   * @param startBit the bit to start searching from
    * @return the next unset bit.
    */
   public int getNextNonSetBit(int startBit) {
@@ -134,11 +128,9 @@ public class BitVector {
 
   /**
    * Checks whether this bitvector at the given start position and the given bitvector are disjoint.
-   * 
-   * @param other
-   *          a bitvector to compare with
-   * @param startBit
-   *          the start position of this BitVector
+   *
+   * @param other a bitvector to compare with
+   * @param startBit the start position of this BitVector
    * @return true if the sets are disjoint.
    */
   public boolean Disjoint(BitVector other, int startBit) {
@@ -164,15 +156,14 @@ public class BitVector {
   }
 
   /**
-   * Checks whether this bitvector at the given start position and the given bitvector are disjoint and otherwise
-   * returns the minimum number of bits the "other" has to be shifted.
-   * 
-   * @param other
-   *          a bitvector to compare with
-   * @param startBit
-   *          the start positions
+   * Checks whether this bitvector at the given start position and the given bitvector are disjoint
+   * and otherwise returns the minimum number of bits the "other" has to be shifted.
+   *
+   * <p>Note: This method is a performance critical.
+   *
+   * @param other a bitvector to compare with
+   * @param startBit the start positions
    * @return 0 if the sets are disjoint, otherwise the minimum number of shift operations.
-   * @remarks This method is a performance critical.
    */
   public int DisjointAndShiftOther(BitVector other, int startBit) {
     int bytePosition = startBit >> 6;
@@ -197,15 +188,14 @@ public class BitVector {
   }
 
   /**
-   * Checks whether this bit vector at the given start position and the given bitvector are disjoint and returns the
-   * minimum number of bits to shift until it could fit.
-   * 
-   * @param other
-   *          the bit vector to compare with
-   * @param startBit
-   *          the starting position in this bit vector
+   * Checks whether this bit vector at the given start position and the given bitvector are disjoint
+   * and returns the minimum number of bits to shift until it could fit.
+   *
+   * <p>Note: This method is a performance hotspot.
+   *
+   * @param other the bit vector to compare with
+   * @param startBit the starting position in this bit vector
    * @return 0 if the sets are disjoint, otherwise the minimum number of shift operations.
-   * @remark This method is a performance hotspot.
    */
   public int DisjointAndShiftThis(BitVector other, int startBit) {
     int bytePosition = startBit >> 6;
@@ -265,7 +255,8 @@ public class BitVector {
     }
 
     if (byte_position + 1 < bits.length) {
-      return (bits[byte_position] >>> bit_position) | (bits[byte_position + 1] << (64 - bit_position));
+      return (bits[byte_position] >>> bit_position)
+          | (bits[byte_position + 1] << (64 - bit_position));
     }
 
     return bits[byte_position] >>> bit_position;

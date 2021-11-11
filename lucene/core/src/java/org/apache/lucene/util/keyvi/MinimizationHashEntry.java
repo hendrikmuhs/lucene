@@ -1,25 +1,27 @@
 package org.apache.lucene.util.keyvi;
 
+/** Interface for an entry in the minimization hash. */
 public interface MinimizationHashEntry {
 
-	public interface Key {
+  /** A key in the minimization hash. */
+  public interface Key {
 
-		void set(int offset, int hashcode, int numberOutgoingStatesAndCookie);
+    void set(int offset, int hashcode, int numberOutgoingStatesAndCookie);
 
-		int getExtra();
+    int getExtra();
 
-		int recalculateExtra(int extra, int newCookie);
+    int recalculateExtra(int extra, int newCookie);
 
-		int getCookie();
+    int getCookie();
 
-		void setCookie(int value);
+    void setCookie(int value);
 
-		int getOffset();
+    int getOffset();
 
-		boolean isEmpty();
-	}
-	
-	int getCookie(int numberOutgoingStatesAndCookie);
+    boolean isEmpty();
+  }
 
-	int getMaxCookieSize();
+  int getCookie(int numberOutgoingStatesAndCookie);
+
+  int getMaxCookieSize();
 }

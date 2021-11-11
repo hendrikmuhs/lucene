@@ -17,17 +17,32 @@
 
 package org.apache.lucene.util.keyvi;
 
+import static java.nio.charset.StandardCharsets.*;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-
 import org.apache.lucene.codecs.CodecUtil;
 import org.apache.lucene.store.DataOutput;
 
-import static java.nio.charset.StandardCharsets.*;
-
+/**
+ * Implementation for generating a fsa from a sorted list of key-value pairs. The algorithm uses a
+ * stack for each column, example:
+ *
+ * <p>stack |12345 -------|------------------ k |aa e |abc y |abcde s |abe
+ *
+ * <p>We process key by key (must be in sorted order) and fill the stacks for the non-common suffix
+ * when comparing two consecutive keys. For example in step 1 we compare "aa" with "abc" and put "a"
+ * (the second "a" of "aa") into stack 2, step 2 compares "abc" with "abcde", we do nothing except
+ * remembering that "c" is a state, in step 3 ( "abe", "abcde" ): "e" into stack 5, "c" into stack
+ * 3, "d" into stack 4 ... In each iteration we check which stacks can be "consumed", that means we
+ * collected all outgoing transitions of a state in the state automaton. We pop (take out and
+ * delete) these stacks and put the transition vector into the automaton. In our example our first
+ * stack we consume stack 5 first, containing "e", than stack 4 with "d", stack 3 with "c", "e" and
+ * so on. Note: The input must be sorted according to a user-defined sort order.
+ */
 public class Generator implements Closeable {
 
   public static final String CODEC_NAME = "KEYVI";
@@ -114,7 +129,7 @@ public class Generator implements Closeable {
     out.writeVInt(numberOfStates);
     // value store type
     out.writeVInt(1);
-    
+
     persistence.write(out);
   }
 
@@ -127,9 +142,18 @@ public class Generator implements Closeable {
 
   private void writeHeader(OutputStream stream) throws IOException {
 
-    String properties = "{\"version\":\"" + 2 + "\", \"start_state\":\"" + startState + "\", \"number_of_keys\":\""
-        + numberOfKeysAdded + "\", \"value_store_type\":\"" + 1 + "\", \"number_of_states\":\"" + numberOfStates
-        + "\"}";
+    String properties =
+        "{\"version\":\""
+            + 2
+            + "\", \"start_state\":\""
+            + startState
+            + "\", \"number_of_keys\":\""
+            + numberOfKeysAdded
+            + "\", \"value_store_type\":\""
+            + 1
+            + "\", \"number_of_states\":\""
+            + numberOfStates
+            + "\"}";
 
     byte[] propertiesBytes = properties.getBytes(UTF_8);
 
@@ -147,7 +171,7 @@ public class Generator implements Closeable {
      * std::to_string(number_of_keys_added_)); pt.put("value_store_type",
      * std::to_string(value_store_->GetValueStoreType())); pt.put("number_of_states",
      * std::to_string(number_of_states_)); pt.add_child("manifest", manifest_);
-     * 
+     *
      * keyvi::util::SerializationUtils::WriteJsonRecord(stream, pt);
      */
   }
@@ -155,7 +179,8 @@ public class Generator implements Closeable {
   private int getCommonPrefixLength(byte[] first, byte[] second) {
     int commonPrefixLength = 0;
 
-    while (commonPrefixLength < first.length && commonPrefixLength < second.length
+    while (commonPrefixLength < first.length
+        && commonPrefixLength < second.length
         && first[commonPrefixLength] == second[commonPrefixLength]) {
       ++commonPrefixLength;
     }
@@ -183,8 +208,8 @@ public class Generator implements Closeable {
 
       // Save transition_pointer in previous stack, indicate whether it makes
       // sense continuing minimization
-      unpackedStateStack.pushTransitionPointer(highestStack - 1, transistionPointer,
-          unpackedState.getNoMinimizationCounter());
+      unpackedStateStack.pushTransitionPointer(
+          highestStack - 1, transistionPointer, unpackedState.getNoMinimizationCounter());
 
       // Delete state
       unpackedStateStack.Erase(highestStack);
@@ -192,5 +217,4 @@ public class Generator implements Closeable {
       --highestStack;
     }
   }
-
 }
