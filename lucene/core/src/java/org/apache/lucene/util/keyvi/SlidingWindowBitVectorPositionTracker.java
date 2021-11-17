@@ -56,6 +56,8 @@ public class SlidingWindowBitVectorPositionTracker {
     if (blockerWindow > windowStartPosition) {
       return position;
     }
+    // System.out.println("nextFreeSlot " + blockerOffset + " window " + blockerWindow + " window
+    // start " + windowStartPosition);
 
     if (blockerWindow < windowStartPosition) {
       long offset = previousVector.getNextNonSetBit(blockerOffset);
@@ -68,7 +70,7 @@ public class SlidingWindowBitVectorPositionTracker {
       ++blockerWindow;
       blockerOffset = 0;
     }
-
+    // System.out.println("getNextNonSetBit " + blockerOffset + " window " + blockerWindow);
     return currentVector.getNextNonSetBit(blockerOffset) + (blockerWindow << SLIDING_WINDOW_SHIFT);
   }
 
@@ -85,6 +87,8 @@ public class SlidingWindowBitVectorPositionTracker {
       currentVector = tmp;
       currentVector.clear();
       windowStartPosition = blockerWindow;
+
+      // System.out.println("Sliding Window slide:   new start position " + windowStartPosition);
     }
 
     if (blockerWindow == windowStartPosition) {
@@ -100,6 +104,9 @@ public class SlidingWindowBitVectorPositionTracker {
     long blockerWindowEnd = (position + other.size()) >> SLIDING_WINDOW_SHIFT;
     int blockerOffset = (int) position & SLIDING_WINDOW_MASK;
 
+    // System.out.println("SetVec requested_positions_size " + other.size() + " position " +
+    // position);
+
     // check if start position is already over the boundary now
     if (blockerWindowEnd > windowStartPosition) {
       // swap and reset
@@ -107,7 +114,10 @@ public class SlidingWindowBitVectorPositionTracker {
       previousVector = currentVector;
       currentVector = tmp;
       currentVector.clear();
-      windowStartPosition = blockerWindow;
+      windowStartPosition = blockerWindowEnd;
+
+      // System.out.println("Vec Sliding Window slide:   new start position " +
+      // windowStartPosition);
     }
 
     if (blockerWindow == windowStartPosition) {

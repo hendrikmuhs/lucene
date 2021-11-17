@@ -59,7 +59,9 @@ public class Generator implements Closeable {
 
   public Generator() throws IOException {
 
+    // int memoryLimit = 1024 * 1024 * 1024;
     int memoryLimit = 1000000;
+
     Path temporaryDirectory = Files.createTempDirectory("keyvi-generator");
     persistence = new SparseArrayPersistence(memoryLimit, temporaryDirectory);
     sparseArrayBuilder = new SparseArrayBuilder(memoryLimit, persistence, false, true);
@@ -74,6 +76,10 @@ public class Generator implements Closeable {
   }
 
   public void add(String key) {
+    add(key, 0);
+  }
+
+  public void add(String key, int value) {
 
     byte[] utf8Key = key.getBytes(UTF_8);
 
@@ -88,7 +94,9 @@ public class Generator implements Closeable {
 
     // get value and mark final state
     boolean noMinimization = false;
-    int valueIndex = 0; // value_store_->GetValue(value, &no_minimization);
+    //boolean noMinimization = true;
+
+    int valueIndex = value; // value_store_->GetValue(value, &no_minimization);
 
     unpackedStateStack.insertFinalState(utf8Key.length, valueIndex, noMinimization);
 
@@ -118,7 +126,6 @@ public class Generator implements Closeable {
 
     numberOfStates = (int) sparseArrayBuilder.getNumberOfStates();
     sparseArrayBuilder = null;
-
     persistence.flush();
   }
 
@@ -131,6 +138,35 @@ public class Generator implements Closeable {
     out.writeVInt(1);
 
     persistence.write(out);
+  }
+
+  public void writeKeyvi(DataOutput out) throws IOException {
+    out.writeBytes(KeyviConstants.KEYVI_FILE_MAGIC, KeyviConstants.KEYVI_FILE_MAGIC.length);
+
+    String properties =
+        "{\"version\":\""
+            + 2
+            + "\", \"start_state\":\""
+            + startState
+            + "\", \"number_of_keys\":\""
+            + numberOfKeysAdded
+            + "\", \"value_store_type\":\""
+            + 1
+            + "\", \"number_of_states\":\""
+            + numberOfStates
+            + "\"}";
+
+    byte[] propertiesBytes = properties.getBytes(UTF_8);
+
+    // todo: re-factor, writing 32bit int
+
+    out.writeByte((byte) ((propertiesBytes.length >>> 24) & 0xFF));
+    out.writeByte((byte) ((propertiesBytes.length >>> 16) & 0xFF));
+    out.writeByte((byte) ((propertiesBytes.length >>> 8) & 0xFF));
+    out.writeByte((byte) (propertiesBytes.length & 0xFF));
+    out.writeBytes(propertiesBytes, propertiesBytes.length);
+
+    persistence.writeKeyvi(out);
   }
 
   public void writeKeyvi(OutputStream stream) throws IOException {
@@ -188,9 +224,8 @@ public class Generator implements Closeable {
   }
 
   private void feedStack(int start, byte[] key) {
-
     for (int i = start; i < key.length; ++i) {
-      unpackedStateStack.insert(i, key[i], 0);
+      unpackedStateStack.insert(i, Byte.toUnsignedInt(key[i]), 0);
     }
 
     // remember highest stack

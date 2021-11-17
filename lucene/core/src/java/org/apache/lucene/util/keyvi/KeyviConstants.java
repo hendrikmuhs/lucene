@@ -2,10 +2,10 @@ package org.apache.lucene.util.keyvi;
 
 /** A couple of common constants. */
 public class KeyviConstants {
-  public static final int MAX_TRANSITIONS_OF_A_STATE = 257;
+  public static final int MAX_TRANSITIONS_OF_A_STATE = 261;
   public static final int FINAL_OFFSET_TRANSITION = 256;
   public static final int INNER_WEIGHT_TRANSITION_COMPACT = 260;
-  public static final char FINAL_OFFSET_CODE = 1;
+  public static final byte FINAL_OFFSET_CODE = 1;
   public static final int NUMBER_OF_STATE_CODINGS = 255;
   public static final long SPARSE_ARRAY_SEARCH_OFFSET = 151;
   public static final int COMPACT_SIZE_RELATIVE_MAX_VALUE = 32768;

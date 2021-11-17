@@ -28,22 +28,24 @@ import org.apache.lucene.util.fst.FSTCompiler;
 import org.apache.lucene.util.fst.PositiveIntOutputs;
 import org.apache.lucene.util.fst.Util;
 
-/**
- * FST builder, taking a set of keys and mapping them to a number
- */
+/** FST builder, taking a set of keys and mapping them to a number */
 public class FstBuilder {
   private final IntsRefBuilder intsRefBuilder = new IntsRefBuilder();
-  private final FSTCompiler<Long> fstCompiler = new FSTCompiler<>(FST.INPUT_TYPE.BYTE1, PositiveIntOutputs.getSingleton());
+  // private final FSTCompiler<Long> fstCompiler = new FSTCompiler<>(FST.INPUT_TYPE.BYTE1,
+  // PositiveIntOutputs.getSingleton());
+
+  private final FSTCompiler<Long> fstCompiler =
+      new FSTCompiler.Builder<>(FST.INPUT_TYPE.BYTE1, PositiveIntOutputs.getSingleton())
+          .shouldShareNonSingletonNodes(false) // breaks if set to true
+          .build();
   private long ordinal = 1;
 
-  /**
-   * Create a fst builder.
-   */
+  /** Create a fst builder. */
   public FstBuilder() {}
-  
+
   /**
    * Build the fst
-   * 
+   *
    * @param inputFile input file in text format, 1 key per line
    * @param output the index output to write the result to
    */
@@ -63,8 +65,10 @@ public class FstBuilder {
     if (line == null || line.length() == 0) {
       return false;
     }
-    fstCompiler.add(Util.toIntsRef(new BytesRef(line), intsRefBuilder), ordinal++);
+
+    // System.out.println("Adding: " + line);
+    BytesRef utf8Bytes = new BytesRef(line);
+    fstCompiler.add(Util.toIntsRef(utf8Bytes, intsRefBuilder), ordinal++);
     return true;
   }
-
 }

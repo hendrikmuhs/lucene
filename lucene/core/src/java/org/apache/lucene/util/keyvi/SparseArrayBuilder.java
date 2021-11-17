@@ -56,11 +56,14 @@ public class SparseArrayBuilder {
 
     PackedState existingState = new PackedState();
     PackedState.Key existingKey = existingState.new Key();
-
+    // System.out.println("no minimization counter " + unpackedState.getNoMinimizationCounter());
     if (unpackedState.getNoMinimizationCounter() == 0) {
       // try to find a match of two equal states to minimize automata
       if (stateHashTable.get(unpackedState, existingKey)) {
         // if we are hitting this line minimization succeeded
+        // System.out.println("found minimization, equal state: " +  existingKey.getOffset() + "
+        // this->weight " + unpackedState.getWeight());
+
         int offset = existingKey.getOffset();
         if (unpackedState.getWeight() > 0) {
           updateWeightIfNeeded(offset, unpackedState.getWeight());
@@ -69,6 +72,8 @@ public class SparseArrayBuilder {
         return offset;
       }
     }
+
+    // System.out.println("no minimization found, write a new state");
     // minimization failed, all predecessors of this state will not be minimized, so
     // stop trying
     unpackedState.incrementNoMinimizationCounter();
@@ -107,15 +112,18 @@ public class SparseArrayBuilder {
 
     // further shift it taking the first outgoing transition and find the slot where
     // it fits in
+    // System.out.println("next free slot starting from " + startPosition);
     startPosition =
         takenPositionsInSparsearray.nextFreeSlot(startPosition + unpackedState.get(0).getLabel())
             - unpackedState.get(0).getLabel();
 
     do {
+      //System.out.println("Find free position, probing " + startPosition);
       startPosition = stateStartPositions.nextFreeSlot(startPosition);
 
       if (zeroByteScramblingStateStartPositions.isSet(startPosition)) {
         // clash with zerobyte start position, skip it
+        // System.out.println("clash with zerobyte start position, skip it.");
         ++startPosition;
         continue;
       }
@@ -141,13 +149,15 @@ public class SparseArrayBuilder {
             && stateStartPositions.isSet(startPosition - KeyviConstants.NUMBER_OF_STATE_CODINGS)) {
           ++startPosition;
           // interference with other state, continue search
-
+          // System.out.println("interference with other state, continue search");
           continue;
         }
 
         if (unpackedState.get(0).getLabel() != 0
             && !takenPositionsInSparsearray.isSet(startPosition)) {
           // need special handling for zero-byte state, position
+          // System.out.println("Need special handling for zero-byte state, position " +
+          // startPosition);
 
           // state has no 0-byte, we have to 'scramble' the 0-byte to avoid a ghost state
           if (startPosition >= KeyviConstants.NUMBER_OF_STATE_CODINGS) {
@@ -158,6 +168,7 @@ public class SparseArrayBuilder {
 
             if (zerobyteScramblingState >= startPosition) {
               // unable to scramble zero byte position
+              // System.out.println("unable to scramble zero byte position, continue search");
               ++startPosition;
               continue;
             }
@@ -168,21 +179,30 @@ public class SparseArrayBuilder {
                 && stateStartPositions.isSet(
                     startPosition - KeyviConstants.NUMBER_OF_STATE_CODINGS)) {
               // unable to scramble zero byte position (state finalization), continue search
+              // System.out.println("unable to scramble zero byte position (state finalization),
+              // continue search");
               ++startPosition;
               continue;
             }
 
             // found zero byte label
+            // System.out.println("Found zero byte label " +
+            // Byte.toUnsignedInt(zerobyteScramblingLabel) + " ,position " +
+            // zerobyteScramblingState);
+
             unpackedState.setZeroByteState(zerobyteScramblingState);
             unpackedState.setZeroByteLabel(zerobyteScramblingLabel);
           }
         }
 
         // found slot at
+        // System.out.println("found slot at " + startPosition);
         return startPosition;
       }
 
       // state does not fit in, shifting start position
+      // System.out.println("state does not fit in, got shift of " + shift + " (statesize " +
+      // unpackedState.size() + ")");
 
       startPosition += shift;
     } while (true);
@@ -207,6 +227,8 @@ public class SparseArrayBuilder {
       }
 
       // no zero byte, need special handling
+      // System.out.println("no zero byte, need special handling");
+
       // check if something is already written there
       if (takenPositionsInSparsearray.isSet(offset) == false) {
         if (offset >= KeyviConstants.NUMBER_OF_STATE_CODINGS) {
@@ -228,6 +250,7 @@ public class SparseArrayBuilder {
       }
 
       // zero byte to be written
+      // System.out.println("zero byte to be written");
     }
 
     // 1st pass: reserve the buckets in the sparse array
@@ -253,6 +276,7 @@ public class SparseArrayBuilder {
       } else {
         if (e.getLabel() == KeyviConstants.FINAL_OFFSET_TRANSITION) {
           writeFinalTransition(offset, e.getValue());
+          // System.out.println("Write final marker at " + offset + ", value " + e.getValue());
         }
       }
     }
@@ -303,7 +327,8 @@ public class SparseArrayBuilder {
    * Pointer, higher bits
    */
   void writeTransition(int offset, byte transitionId, int transitionPointer) {
-
+    // System.out.println("Write offset: " + offset + ", label: " +
+    // Byte.toUnsignedInt(transitionId));
     int difference = Integer.MAX_VALUE;
     if (offset + KeyviConstants.COMPACT_SIZE_WINDOW > transitionPointer) {
       difference = offset + KeyviConstants.COMPACT_SIZE_WINDOW - transitionPointer;
@@ -312,17 +337,21 @@ public class SparseArrayBuilder {
     if (difference < KeyviConstants.COMPACT_SIZE_RELATIVE_MAX_VALUE) {
       short diffAsShort = (short) difference;
       // transition fits in uint16
-
+      // System.out.println("Transition fits in uint16 relative: " + offset + "->" +
+      // transitionPointer + " (" + diffAsShort + ")");
       persistence.writeTransition(offset, transitionId, diffAsShort);
       return;
     }
 
     if (transitionPointer < KeyviConstants.COMPACT_SIZE_ABSOLUTE_MAX_VALUE) {
       // Transition fits in uint16 absolute
+      // System.out.println("Transition fits in uint16 absolute: "+ offset+"->"+ transitionPointer);
       short absoluteCompactCoding = (short) ((short) (transitionPointer) | 0xc000);
       persistence.writeTransition(offset, transitionId, absoluteCompactCoding);
       return;
     }
+
+    // System.out.println("Transition requires overflow "+offset+"->"+ transitionPointer);
     // transition requires overflow
     // pointer to overflow bucket with variable length encoding
     // set first bit to indicate overflow
@@ -401,7 +430,8 @@ public class SparseArrayBuilder {
 
         if (zerobyteScramblingState >= startPosition) {
           // did not find a state to scramble zero-bytes, no good start position, skipping
-
+          // System.out.println("Did not find a state to scramble zero-bytes, no good start
+          // position, skipping " + startPosition);
           // we can probable advance more if this happens
           startPosition += foundSlots + 1;
           foundSlots = 0;
@@ -410,7 +440,8 @@ public class SparseArrayBuilder {
 
           if (zerobyteScramblingLabel == KeyviConstants.FINAL_OFFSET_CODE) {
             // did not find a state to scramble zero-bytes, skipping
-
+            // System.out.println("Did not find a state to scramble zero-bytes, skipping " +
+            // startPosition);
             // we can probable advance more if this happens
             startPosition += foundSlots + 1;
             foundSlots = 0;
@@ -424,6 +455,7 @@ public class SparseArrayBuilder {
     }
 
     // write overflow transition
+    // System.out.println("Write Overflow transition at "+startPosition+", length " + vshortSize);
 
     // block the pseudo state used for zerobyte scrambling
     // state_start_positions_.Set(zerobyte_scrambling_state);

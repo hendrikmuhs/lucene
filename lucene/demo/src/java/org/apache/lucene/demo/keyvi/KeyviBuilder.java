@@ -16,13 +16,59 @@
  */
 package org.apache.lucene.demo.keyvi;
 
-/**
- * Dictionary builder using the keyvi algorithm.
- */
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import org.apache.lucene.store.IndexOutput;
+import org.apache.lucene.util.keyvi.Generator;
+
+/** Dictionary builder using the keyvi algorithm. */
 public class KeyviBuilder {
+
+  private int ordinal = 1;
+  private final Generator keyviCompiler;
 
   /**
    * Create a keyvi builder.
+   *
+   * @throws IOException
    */
-  public KeyviBuilder() {}
+  public KeyviBuilder() throws IOException {
+    keyviCompiler = new Generator();
+  }
+
+  /**
+   * Build the keyvi fst
+   *
+   * @param inputFile input file in text format, 1 key per line
+   * @param output the index output to write the result to
+   */
+  public void build(Path inputFile, IndexOutput output, boolean compatMode) throws IOException {
+    try (BufferedReader in = Files.newBufferedReader(inputFile)) {
+
+      while (addOneLine(in, output)) {
+        // continue;
+      }
+      keyviCompiler.closeFeeding();
+      if (compatMode) {
+        keyviCompiler.writeKeyvi(output);
+      } else {
+        keyviCompiler.write(output);
+      }
+    }
+  }
+
+  private boolean addOneLine(BufferedReader in, IndexOutput out) throws IOException {
+
+    String line = in.readLine();
+    if (line == null || line.length() == 0) {
+      return false;
+    }
+    // System.out.println("Adding: " + line);
+    //keyviCompiler.add(line);
+    keyviCompiler.add(line, ordinal++);
+
+    return true;
+  }
 }

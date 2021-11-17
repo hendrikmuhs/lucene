@@ -120,6 +120,12 @@ public class BitVector {
     while (a == MAX_UNSIGNED) {
       ++bytePosition;
       startBit += 64;
+
+      // todo: this fix need verfication and unit tests, it's not 100% clear why this happens
+      // as 1 byte extra is used
+      if (startBit >= size) {
+        return size;
+      }
       a = getUnderlyingIntegerAtPosition(bytePosition, bitPosition);
     }
 

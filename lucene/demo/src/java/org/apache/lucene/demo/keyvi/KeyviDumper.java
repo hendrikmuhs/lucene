@@ -14,6 +14,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.lucene.demo.keyvi;
 
-/** FST experimentation code. */
-package org.apache.lucene.demo.fst;
+import java.io.IOException;
+import org.apache.lucene.store.IndexInput;
+
+/** FST dumper */
+public class KeyviDumper {
+
+  /** Create a fst dumper. */
+  public KeyviDumper() {}
+
+  /**
+   * Dump a keyvi dictionary
+   *
+   * @param input the dictionary input
+   */
+  public void dump(IndexInput input) throws IOException {}
+}

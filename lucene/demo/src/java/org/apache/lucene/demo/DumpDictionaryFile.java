@@ -16,86 +16,58 @@
  */
 package org.apache.lucene.demo;
 
-import java.io.FileNotFoundException;
-import java.nio.file.NoSuchFileException;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import org.apache.lucene.demo.fst.FstBuilder;
-import org.apache.lucene.demo.keyvi.KeyviBuilder;
+import org.apache.lucene.demo.fst.FstDumper;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.IOContext;
-import org.apache.lucene.store.IndexOutput;
+import org.apache.lucene.store.IndexInput;
 
-/**
- * Create a dictionary from a text file.
- *
- * <p>This command-line application is made for comparing the current FST implementation with the
- * keyvi FST algorithm
- */
-public class CreateDictionaryFile {
+/** Dump dictionary file for verification. */
+public class DumpDictionaryFile {
 
-  private CreateDictionaryFile() {}
+  private DumpDictionaryFile() {}
 
-  /** Create a dictionary from a text file */
+  /** Dump a dictionary to a text file */
   public static void main(String[] args) throws Exception {
     String usage =
-        "java org.apache.lucene.demo.CreateDictionaryFile"
-            + " [-i INPUT_FILE] [-o OUTPUT_FILE] [-d TYPE]\n\n"
-            + "This creates a dictionary using INPUT_FILE, creating OUTPUT_FILE.\n"
+        "java org.apache.lucene.demo.DumpDictionaryFile"
+            + " [-i INPUT_FILE] [-d TYPE]\n\n"
+            + "This dumps a dictionary INPUT_FILE to stdout.\n"
             + "Using -d, the TYPE can be switched from fst (lucene) and keyvi (experimental)";
 
     String inputFile = null;
-    String outputFile = null;
     String type = "fst";
-    boolean keyviCompatMode = false;
 
     for (int i = 0; i < args.length; i++) {
       switch (args[i]) {
         case "-i":
           inputFile = args[++i];
           break;
-        case "-o":
-          outputFile = args[++i];
-          break;
         case "-d":
           type = args[++i];
           break;
-        case "-keyvi-compat":
-          keyviCompatMode = true;
-          break;
-
         default:
           throw new IllegalArgumentException("unknown parameter " + args[i]);
       }
     }
 
-    if (inputFile == null || outputFile == null) {
+    if (inputFile == null) {
       System.err.println("Usage: " + usage);
       System.exit(1);
     }
 
     Directory dir = FSDirectory.open(Paths.get("dictionaries"));
 
-    // overwrite existing file
-    try {
-      dir.deleteFile(outputFile);
-    } catch (NoSuchFileException | FileNotFoundException e) {
-    }
-
-    IndexOutput out = dir.createOutput(outputFile, IOContext.DEFAULT);
-    Path inputPath = Paths.get(inputFile);
+    IndexInput in = dir.openInput(inputFile, IOContext.DEFAULT);
 
     if (type.equalsIgnoreCase("fst")) {
-      new FstBuilder().build(inputPath, out);
+      new FstDumper().dump(in);
     } else if (type.equalsIgnoreCase("keyvi")) {
-      new KeyviBuilder().build(inputPath, out, keyviCompatMode);
     } else {
       System.err.println("type must be either fst or keyvi");
       System.err.println("Usage: " + usage);
       System.exit(1);
     }
-
-    out.close();
   }
 }

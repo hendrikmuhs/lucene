@@ -300,7 +300,6 @@ public class MinimizationHash<T extends MinimizationHashEntry> {
     entry.set(entriesOffsets[bucket], entriesHashes[bucket], entriesCookies[bucket]);
     if (entry.isEmpty() == false) {
       if (key.equals(entry)) {
-
         // delete the old entry
         int overflowBucket = entry.getCookie();
         if (overflowBucket != 0) {
@@ -402,7 +401,7 @@ public class MinimizationHash<T extends MinimizationHashEntry> {
 
   private void insert(T.Key key) {
     int hash = key.hashCode() & 0x7fffffff;
-    ;
+
     int bucket = hash % hashSize;
 
     if (entriesOffsets[bucket] == 0) {
@@ -417,7 +416,6 @@ public class MinimizationHash<T extends MinimizationHashEntry> {
       if (overflowCount == entry.getMaxCookieSize()) {
         return;
       }
-      // todo: only get the cookie!
       int overflowBucket = entry.getCookie(entriesCookies[bucket]);
 
       if (overflowBucket == 0) {
@@ -430,11 +428,7 @@ public class MinimizationHash<T extends MinimizationHashEntry> {
         int numberOfOverflows = 0;
 
         while (overflowEntriesCookies[overflowBucket] != 0 && numberOfOverflows < overflowLimit) {
-          // todo: only get the cookie!
-          bucket = overflowBucket;
-
           overflowBucket = entry.getCookie(overflowEntriesCookies[overflowBucket]);
-
           ++numberOfOverflows;
         }
 
@@ -442,8 +436,8 @@ public class MinimizationHash<T extends MinimizationHashEntry> {
           return;
         }
 
-        overflowEntriesCookies[bucket] =
-            key.recalculateExtra(overflowEntriesCookies[bucket], overflowCount);
+        overflowEntriesCookies[overflowBucket] =
+            key.recalculateExtra(overflowEntriesCookies[overflowBucket], overflowCount);
         overflowEntriesOffsets[overflowCount] = key.getOffset();
         overflowEntriesHashes[overflowCount] = key.hashCode();
         overflowEntriesCookies[overflowCount] = key.getExtra();

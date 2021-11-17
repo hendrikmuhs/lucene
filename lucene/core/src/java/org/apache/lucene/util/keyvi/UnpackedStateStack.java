@@ -52,6 +52,7 @@ public final class UnpackedStateStack {
     // so we should
     // not overwrite it.
     if (noMinimization) {
+      // System.out.println("Set no minimization based on value.");
       state.incrementNoMinimizationCounter();
     }
   }
@@ -72,6 +73,9 @@ public final class UnpackedStateStack {
   }
 
   public void pushTransitionPointer(int position, int transitionValue, int minimizationCounter) {
+    // System.out.println("UnpackedStateStack: push transition pointer at "+ position + " to " +
+    // transitionValue);
+
     UnpackedState state = get(position);
     state.setTransitionValue(transitionValue);
     state.incrementNoMinimizationCounter(minimizationCounter);

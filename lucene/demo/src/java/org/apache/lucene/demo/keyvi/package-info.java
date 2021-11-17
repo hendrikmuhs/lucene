@@ -15,7 +15,5 @@
  * limitations under the License.
  */
 
-/**
- * Keyvi experimentation code.
- */
+/** Keyvi experimentation code. */
 package org.apache.lucene.demo.keyvi;

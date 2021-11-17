@@ -103,12 +103,19 @@ public class SparseArrayPersistence implements Closeable {
     labelsExtern.getAddressAsByteBuffer(offset).put(transitionId);
     transitionsExtern.getAddressAsByteBuffer(offset * 2).asShortBuffer().put(transitionPointer);
   }
-
+  /*
   public int readTransitionLabel(int offset) {
     if (offset >= inMemoryBufferOffset) {
       return labels[offset - inMemoryBufferOffset];
     }
     return labelsExtern.getAddressAsByteBuffer(offset).get();
+  }*/
+
+  public int readTransitionLabel(int offset) {
+    if (offset >= inMemoryBufferOffset) {
+      return Byte.toUnsignedInt(labels[offset - inMemoryBufferOffset]);
+    }
+    return Byte.toUnsignedInt(labelsExtern.getAddressAsByteBuffer(offset).get());
   }
 
   public short readTransitionValue(int offset) {
@@ -217,6 +224,7 @@ public class SparseArrayPersistence implements Closeable {
       labelsExtern.append(labels, highestWritePosition - inMemoryBufferOffset);
 
       transitionsExtern.append(transitions, highestWritePosition - inMemoryBufferOffset);
+      // System.out.println("flushed " + labels.length);
 
       labels = null;
       transitions = null;
@@ -232,6 +240,26 @@ public class SparseArrayPersistence implements Closeable {
     // version
     out.writeVInt(2);
     out.writeVInt(highestWritePosition);
+    labelsExtern.write(out, highestWritePosition);
+    transitionsExtern.write(out, highestWritePosition * 2);
+  }
+
+  public void writeKeyvi(DataOutput out) throws IOException {
+    int highestWritePosition =
+        Math.max(
+            highestStateBegin + KeyviConstants.MAX_TRANSITIONS_OF_A_STATE,
+            highestRawWriteBucket + 1);
+
+    String properties = "{\"version\":\"" + 2 + "\", \"size\":\"" + highestWritePosition + "\"}";
+
+    byte[] propertiesBytes = properties.getBytes(UTF_8);
+
+    out.writeByte((byte) ((propertiesBytes.length >>> 24) & 0xFF));
+    out.writeByte((byte) ((propertiesBytes.length >>> 16) & 0xFF));
+    out.writeByte((byte) ((propertiesBytes.length >>> 8) & 0xFF));
+    out.writeByte((byte) (propertiesBytes.length & 0xFF));
+    out.writeBytes(propertiesBytes, propertiesBytes.length);
+
     labelsExtern.write(out, highestWritePosition);
     transitionsExtern.write(out, highestWritePosition * 2);
   }

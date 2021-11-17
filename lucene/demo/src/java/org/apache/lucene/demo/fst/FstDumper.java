@@ -14,6 +14,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-/** FST experimentation code. */
 package org.apache.lucene.demo.fst;
+
+import java.io.IOException;
+import org.apache.lucene.store.IndexInput;
+import org.apache.lucene.util.fst.BytesRefFSTEnum;
+import org.apache.lucene.util.fst.FST;
+import org.apache.lucene.util.fst.PositiveIntOutputs;
+
+/** FST dumper */
+public class FstDumper {
+
+  /** Create a fst dumper. */
+  public FstDumper() {}
+
+  /**
+   * Dump a fst dictionary
+   *
+   * @param input the dictionary input
+   */
+  public void dump(IndexInput input) throws IOException {
+    FST<Long> fst = new FST<>(input, input, PositiveIntOutputs.getSingleton());
+
+    final BytesRefFSTEnum<Long> fstEnum = new BytesRefFSTEnum<>(fst);
+    BytesRefFSTEnum.InputOutput<Long> entry;
+    while ((entry = fstEnum.next()) != null) {
+      System.out.println(entry.input.utf8ToString());
+    }
+  }
+}

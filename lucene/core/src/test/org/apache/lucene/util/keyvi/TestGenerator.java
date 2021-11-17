@@ -71,6 +71,7 @@ public class TestGenerator extends LuceneTestCase {
     g.add("aabc");
     g.add("aacd");
     g.add("bbcd");
+    g.add("öbcd");
 
     g.closeFeeding();
 
@@ -82,7 +83,7 @@ public class TestGenerator extends LuceneTestCase {
 
     Automata automata = new Automata(in);
 
-    assertEquals(5, automata.getNumberOfKeys());
+    assertEquals(6, automata.getNumberOfKeys());
     int startState = automata.getStartState();
     byte[] k = "aaaa".getBytes(UTF_8);
 

@@ -165,7 +165,7 @@ public class TestBitVector extends LuceneTestCase {
     assertFalse(g.Disjoint(g, 0));
   }
 
-  public void testNextZeroBit() {
+  public void testNextNonSetBit() {
     // 1010 0000
     BitVector a = new BitVector(32);
     assertEquals(0, a.getNextNonSetBit(0));
@@ -208,6 +208,16 @@ public class TestBitVector extends LuceneTestCase {
 
     assertEquals(0, b.getNextNonSetBit(0));
     assertEquals(39, b.getNextNonSetBit(32));
+  }
+
+  public void testNextNonSetBitFullVector() {
+    BitVector a = new BitVector(2048);
+
+    for (int i = 0; i < 2048; ++i) {
+      a.set(i);
+    }
+
+    assertEquals(2048, a.getNextNonSetBit(2048));
   }
 
   public void testSetVector() {
@@ -326,5 +336,21 @@ public class TestBitVector extends LuceneTestCase {
     assertTrue(origin.get(31));
     assertTrue(origin.get(32));
     assertTrue(origin.get(43));
+  }
+
+  public void testSwap() {
+    BitVector a = new BitVector(64);
+    BitVector b = new BitVector(64);
+
+    b.set(53);
+    assertTrue(b.get(53));
+
+    BitVector tmp = a;
+    a = b;
+    b = tmp;
+    b.clear();
+
+    assertTrue(a.get(53));
+    assertFalse(b.get(53));
   }
 }
