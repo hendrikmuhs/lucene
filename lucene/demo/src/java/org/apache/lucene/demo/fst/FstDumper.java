@@ -39,7 +39,7 @@ public class FstDumper {
     final BytesRefFSTEnum<Long> fstEnum = new BytesRefFSTEnum<>(fst);
     BytesRefFSTEnum.InputOutput<Long> entry;
     while ((entry = fstEnum.next()) != null) {
-      System.out.println(entry.input.utf8ToString());
+      System.out.println(entry.input.utf8ToString()); // + "\t" + entry.output);
     }
   }
 }

@@ -95,12 +95,12 @@ public class Automata {
   public int getStateValue(int state) {
     try {
       // todo: *2??
-      in.seek(transitionsOffset + state + KeyviConstants.FINAL_OFFSET_TRANSITION);
+      in.seek(transitionsOffset + 2 * (state + KeyviConstants.FINAL_OFFSET_TRANSITION));
+      return (int) VInt.decodeVarShort(in);
     } catch (IOException e) {
       return 0;
     }
 
-    return 0;
     // return keyvi::util::decodeVarshort(transitions_compact_ + state + FINAL_OFFSET_TRANSITION);
   }
 
@@ -120,14 +120,17 @@ public class Automata {
 
       overflowBucket = (pt >>> 4) + state + c - 512;
 
-      // todo: implement overflow handling
+      in.seek(transitionsOffset + overflowBucket);
 
-      // resolved_ptr = keyvi::util::decodeVarshort(transitions_compact_ + overflow_bucket);
-      // resolved_ptr = (resolved_ptr << 3) + (pt & 0x7);
-      /*
-       * if (pt & 0x8) { // relative coding resolved_ptr = (starting_state + c) - resolved_ptr + 512; }
-       */
-      return 0;
+      long resolvedPointer = VInt.decodeVarShort(in);
+
+      resolvedPointer = (resolvedPointer << 3) + (pt & 0x7);
+
+      if ((pt & 0x8) > 0) {
+        resolvedPointer = (state + c) - resolvedPointer + 512;
+      }
+
+      return (int) resolvedPointer;
     }
 
     return state + (c & 0xff) - pt + 512;

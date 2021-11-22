@@ -118,7 +118,7 @@ public class SparseArrayBuilder {
             - unpackedState.get(0).getLabel();
 
     do {
-      //System.out.println("Find free position, probing " + startPosition);
+      // System.out.println("Find free position, probing " + startPosition);
       startPosition = stateStartPositions.nextFreeSlot(startPosition);
 
       if (zeroByteScramblingStateStartPositions.isSet(startPosition)) {

@@ -94,7 +94,7 @@ public class Generator implements Closeable {
 
     // get value and mark final state
     boolean noMinimization = false;
-    //boolean noMinimization = true;
+    // boolean noMinimization = true;
 
     int valueIndex = value; // value_store_->GetValue(value, &no_minimization);
 

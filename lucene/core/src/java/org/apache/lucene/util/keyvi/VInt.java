@@ -17,7 +17,9 @@
 
 package org.apache.lucene.util.keyvi;
 
+import java.io.IOException;
 import java.nio.ShortBuffer;
+import org.apache.lucene.store.IndexInput;
 
 /** Helper class to encode variable length integers and shorts. */
 public class VInt {
@@ -76,6 +78,21 @@ public class VInt {
 
       // If the next-byte flag is set
       if ((current & 32768) == 0) {
+        break;
+      }
+    }
+    return value;
+  }
+
+  public static long decodeVarShort(IndexInput in) throws IOException {
+    long value = 0;
+    short s;
+    for (int i = 0; ; i++) {
+      s = in.readShort();
+      value |= ((long) s & 32767) << (15 * i);
+
+      // If the next-byte flag is set
+      if ((s & 32768) == 0) {
         break;
       }
     }
